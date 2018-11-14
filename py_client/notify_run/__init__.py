@@ -66,11 +66,7 @@ class Notify:
         self.read_config()
 
         if endpoint is not None:
-            parse_result = urlparse(endpoint)
-            if parse_result.scheme not in ['http', 'https']:
-                raise ValueError('Endpoint should be a URL with an HTTP or HTTPS scheme (scheme was {}.)'.format(
-                    parse_result.scheme))
-            self.endpoint = endpoint
+            self.endpoint = self.validate(endpoint, 'Endpoint')
 
     # Config
 
@@ -108,25 +104,15 @@ class Notify:
     def send(self, message, action=None):
         if self.endpoint is None:
             raise NotConfigured()
+
+        if action is not None:
+            action = self.validate(action, 'Action')
         requests.post(self.endpoint, {'message': message, 'action': action})
 
     def info(self):
         if self.endpoint is None:
             raise NotConfigured
-
-        endpoint = self.endpoint + '/info'
-
-        try:
-            r = requests.get(endpoint).json()
-        except requests.exceptions.ConnectionError:
-            print('Error connecting to {}\n'.format(endpoint))
-            print('Full exception:')
-            raise
-        except json.decoder.JSONDecodeError:
-            print(
-                'Successfully fetched from {} but could not decode JSON.\n'.format(endpoint))
-            print('Full exception:')
-            raise
+        r = requests.get(self.endpoint + '/info').json()
         return EndpointInfo(r)
 
     def register(self):
@@ -134,3 +120,10 @@ class Notify:
         self.endpoint = r['endpoint']
         self.write_config()
         return EndpointInfo(r)
+
+    def validate(self, url, type):
+        parse_result = urlparse(url)
+        if parse_result.scheme not in ['http', 'https']:
+            raise ValueError('{} should be a URL with an HTTP or HTTPS scheme (scheme was {}.)'.format(type,
+                parse_result.scheme))
+        return url
